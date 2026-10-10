@@ -49,34 +49,39 @@ table{width:100%;border-collapse:collapse;font-size:12px}td,th{padding:4px 3px;b
 <label>Table maximum ($)</label><input id="tmax" type="number" min="0">
 <label>Wallet – starting balance ($)</label><input id="bank" type="number" min="0">
 <div class="row"><button id="save" class="btn">Save settings</button></div></div>
-<div class="card note"><b>How it works.</b> After each spin, tap the number. Two sides are tracked separately: dozens (1st/2nd/3rd 12) and columns (2 to 1). On each side a block qualifies when it missed both of the last 2 spins; if 2+ qualify, bet the two coldest (longest since last hit across the log; ties go to the lower block). So a round has 0, 2 or 4 bets. Each of the 6 blocks has its own Fibonacci ladder (1,1,2,3,5,8…): stake = its ladder value × unit. A bet block that hits nets +2× its stake and resets to 1; a bet block that misses (zeros included) loses its stake and steps up one rung; unbet blocks keep their ladder.<br><br><b>Zero hedge</b> (optional): Z covers 0 (35:1) or the 0/00 split (17:1), placed only on rounds where any bet is live. Each such round without a zero is a hedge loss; after 23 in a row Z goes up 1 unit; any zero resets Z to 1 unit and the count to 0.<br><br><b>Can cover N more losses</b> assumes the current (or next most likely) bets all keep losing, each stepping up its own ladder.</div>
+<div class="card note"><b>How it works.</b> Tap the winning number after each spin. Each side (dozens and columns) holds <b>2 active boxes</b> that stay in play from spin to spin.<br><b>Opening:</b> when a side has no active boxes, it waits until 2+ of its boxes have missed the last 2 spins, then opens the 2 coldest (most spins since last hit; ties to the lower box), each at rung 1.<br><b>Loss:</b> an active box that misses (zeros included) loses its stake, steps up its own Fibonacci ladder (1,1,2,3,5,8…) and stays active.<br><b>Win:</b> an active box that hits pays +2× its stake, resets to 1 and is swapped out for the coldest box on that side that isn't active (on a 3-box side, the remaining box), starting at rung 1. The other active box keeps its ladder. Assumption: the replacement starts immediately on the next spin, with no 2-spin wait.<br>Inactive boxes aren't bet. Stake = ladder value × unit.<br><br><b>Zero hedge</b> (optional): Z covers 0 (35:1) or the 0/00 split (17:1), placed on rounds where any bet is live. Each such round without a zero is a hedge loss; after 23 in a row Z goes up 1 unit; any zero resets Z to 1 unit and the count to 0.<br><br><b>Can cover N more losses</b> assumes the current active (or next likely) boxes all keep losing, each stepping up its own ladder.</div>
 </section></main>
 <script id="core">
 const FIB=n=>{let a=1,b=1;for(let i=1;i<n;i++)[a,b]=[b,a+b];return a};
 const SIDES=['D','C'];
 function hitsOf(n){if(n===0||n===37)return{D:-1,C:-1};return{D:Math.floor((n-1)/12),C:(n-1)%3}}
 function newState(cfg){return{cfg:Object.assign({unit:1,wheel:'single',hedge:false,useD:true,useC:true,tmax:500,bank:500},cfg||{}),
- spins:[],count:0,lastHit:{D:[null,null,null],C:[null,null,null]},lad:{D:[1,1,1],C:[1,1,1]},zUnits:1,hedgeLoss:0,net:0,lastWinSpin:0,log:[]}}
+ spins:[],count:0,lastHit:{D:[null,null,null],C:[null,null,null]},lad:{D:[1,1,1],C:[1,1,1]},active:{D:[],C:[]},zUnits:1,hedgeLoss:0,net:0,lastWinSpin:0,log:[]}}
 const cold=(st,side,i)=>st.lastHit[side][i]===null?st.count+1:st.count-st.lastHit[side][i];
 const rank=(st,side,q)=>q.sort((a,b)=>cold(st,side,b)-cold(st,side,a)||a-b).slice(0,2).sort((a,b)=>a-b);
 function signalSide(st,side){if(!st.cfg['use'+side])return null;const s=st.spins;if(s.length<2)return null;
  const last2=s.slice(-2).map(n=>hitsOf(n)[side]);const q=[0,1,2].filter(i=>!last2.includes(i));return q.length<2?null:rank(st,side,q)}
-function nextBet(st){const bets=[];for(const side of SIDES){const bl=signalSide(st,side);if(bl)bl.forEach(i=>bets.push({side,i,S:FIB(st.lad[side][i])*st.cfg.unit}))}
+function sideBoxes(st,side){if(!st.cfg['use'+side])return null;return st.active[side].length?st.active[side].slice():signalSide(st,side)}
+function nextBet(st){const bets=[];for(const side of SIDES){const bl=sideBoxes(st,side);if(bl)bl.forEach(i=>bets.push({side,i,S:FIB(st.lad[side][i])*st.cfg.unit}))}
  if(!bets.length)return null;const Z=st.cfg.hedge?st.zUnits*st.cfg.unit:0;return{bets,Z,outlay:bets.reduce((t,b)=>t+b.S,0)+Z}}
-function applySpin(st,n){const bet=nextBet(st),h=hitsOf(n),isZ=h.D===-1;st.count++;let res=0,rows=[];
+function applySpin(st,n){for(const side of SIDES)if(!st.cfg['use'+side])st.active[side]=[];
+ const bet=nextBet(st),h=hitsOf(n),isZ=h.D===-1;let res=0,rows=[],swaps=[];
+ if(bet){for(const side of SIDES)if(!st.active[side].length){const o=bet.bets.filter(b=>b.side===side).map(b=>b.i);if(o.length){st.active[side]=o;o.forEach(i=>st.lad[side][i]=1)}}}
+ if(!isZ){st.lastHit.D[h.D]=st.count+1;st.lastHit.C[h.C]=st.count+1}st.count++;
  if(bet){let anyWin=false;for(const b of bet.bets){const win=h[b.side]===b.i;const r=win?2*b.S:-b.S;res+=r;rows.push({k:b.side+(b.i+1),S:b.S,r});
-   if(win){st.lad[b.side][b.i]=1;anyWin=true}else st.lad[b.side][b.i]++}
+   if(win){st.lad[b.side][b.i]=1;anyWin=true;const free=[0,1,2].filter(i=>!st.active[b.side].includes(i));const nb=rank(st,b.side,free)[0];
+    st.active[b.side]=st.active[b.side].map(i=>i===b.i?nb:i).sort((x,y)=>x-y);st.lad[b.side][nb]=1;swaps.push(b.side+(b.i+1)+'→'+b.side+(nb+1))}
+   else st.lad[b.side][b.i]++}
   if(anyWin)st.lastWinSpin=st.count;
   if(st.cfg.hedge){if(isZ){res+=bet.Z*(st.cfg.wheel==='double'?17:35);st.zUnits=1;st.hedgeLoss=0}
    else{res-=bet.Z;st.hedgeLoss++;if(st.hedgeLoss>=23){st.zUnits++;st.hedgeLoss=0}}}}
- if(!isZ){st.lastHit.D[h.D]=st.count;st.lastHit.C[h.C]=st.count}
  st.spins.push(n);if(st.spins.length>333)st.spins.shift();st.net+=res;
- st.log.unshift({i:st.count,n,hit:isZ?'zero':'D'+(h.D+1)+' C'+(h.C+1),played:!!bet,bets:rows,Z:bet?bet.Z:0,res,net:st.net});
+ st.log.unshift({i:st.count,n,hit:isZ?'zero':'D'+(h.D+1)+' C'+(h.C+1),played:!!bet,bets:rows,swaps,Z:bet?bet.Z:0,res,net:st.net});
  if(st.log.length>333)st.log.length=333;return st}
 function posOf(n){return{row:2-((n-1)%3),col:Math.ceil(n/3)-1}}
 function tableRows(){return[0,1,2].map(r=>Array.from({length:12},(_,c)=>3*c+3-r))}
 function walletBal(st){return st.cfg.bank+st.net}
-function likelyBets(st){const nb=nextBet(st);if(nb)return nb.bets.map(b=>({side:b.side,i:b.i}));const o=[];
+function likelyBets(st){const nb=nextBet(st);if(!nb&&(st.active.D.length||st.active.C.length))return[];if(nb)return nb.bets.map(b=>({side:b.side,i:b.i}));const o=[];
  for(const side of SIDES)if(st.cfg['use'+side])rank(st,side,[0,1,2]).forEach(i=>o.push({side,i}));return o}
 function pocketDepth(st,max=200){const u=st.cfg.unit,bets=likelyBets(st),L=bets.map(b=>st.lad[b.side][b.i]);let bal=walletBal(st),z=st.zUnits,hl=st.hedgeLoss,k=0;
  if(!bets.length)return{depth:0,maxRung:0};
@@ -103,8 +108,8 @@ function render(){const c=st.cfg,bet=nextBet(st);const sOf=(side,i)=>bet&&bet.be
  const it=[['Bets this round',bet?bet.bets.length:0],['Total outlay',bet?money(bet.outlay):'$0'],['Spins since win',st.count-st.lastWinSpin],['Session net','<span class="'+(st.net<0?'neg':'pos')+'">'+money(st.net)+'</span>']];
  if(c.hedge)it.push(['Zero hedge Z',money(st.zUnits*c.unit)],['Hedge losses',st.hedgeLoss+' / 23']);
  $('stats').innerHTML=it.map(([k,v])=>'<div>'+k+'<br><b>'+v+'</b></div>').join('');
- $('ladders').innerHTML='<tr><th>Block</th><th>Rung</th><th>Value</th><th>Since hit</th><th>Bet</th></tr>'+['D','C'].flatMap(side=>[0,1,2].map(i=>{const b=sOf(side,i),on=c['use'+side];
-  return '<tr'+(on?'':' style="opacity:.4"')+'><td>'+BN[side][i]+'</td><td>'+st.lad[side][i]+'</td><td>'+FIB(st.lad[side][i])+'</td><td>'+(st.lastHit[side][i]===null?'–':st.count-st.lastHit[side][i])+'</td><td>'+(b?'<b>'+money(b.S)+'</b>':'')+'</td></tr>'})).join('');
+ $('ladders').innerHTML='<tr><th>Box</th><th>Rung</th><th>Value</th><th>Since hit</th><th>Bet</th></tr>'+['D','C'].flatMap(side=>[0,1,2].map(i=>{const b=sOf(side,i),on=c['use'+side],act=st.active[side].includes(i);
+  return '<tr'+(on?'':' style="opacity:.4"')+'><td>'+BN[side][i]+(act?' ★':'')+'</td><td>'+st.lad[side][i]+'</td><td>'+FIB(st.lad[side][i])+'</td><td>'+(st.lastHit[side][i]===null?'–':st.count-st.lastHit[side][i])+'</td><td>'+(b?'<b>'+money(b.S)+'</b>':'')+'</td></tr>'})).join('');
  const chip=v=>'<span class="chip">'+v+'</span>';let h='';
  if(c.wheel==='double')h+='<div></div><div style="grid-column:span 3;display:grid;grid-template-columns:1fr 1fr;gap:4px;position:relative"><button class="c zz" data-n="0">0</button><button class="c zz" data-n="37">00</button>'+(bet&&bet.Z?'<span class="chip" style="left:50%;right:auto;margin-left:-13px">'+bet.Z+'</span>':'')+'</div>';
  else h+='<div></div><button class="c zz" style="grid-column:span 3" data-n="0">0'+(bet&&bet.Z?chip(bet.Z):'')+'</button>';
@@ -112,7 +117,7 @@ function render(){const c=st.cfg,bet=nextBet(st);const sOf=(side,i)=>bet&&bet.be
   for(let k=1;k<=3;k++){const n=3*r+k;h+='<button class="c '+(REDS.includes(n)?'r':'k')+'" id="n'+n+'" data-n="'+n+'">'+n+'</button>'}}
  h+='<div></div>'+[0,1,2].map(i=>{const b=sOf('C',i);return '<div class="c cl'+(b?' bet':'')+'" id="blkC'+i+'">2 to 1'+(b?chip(b.S):'')+'</div>'}).join('');
  $('pad').innerHTML=h;
- $('tb').innerHTML=st.log.map(r=>'<tr><td>'+r.i+'</td><td>'+disp(r.n)+'</td><td>'+r.hit+'</td><td style="text-align:left">'+(r.bets.map(b=>b.k+' '+b.S+'→<span class="'+(b.r<0?'neg':'pos')+'">'+(b.r>0?'+':'')+b.r+'</span>').join('<br>')+(r.Z?'<br>Z '+r.Z:'')||'–')+'</td><td class="'+(r.res<0?'neg':r.res>0?'pos':'')+'">'+(r.played?money(r.res):'')+'</td><td>'+money(r.net)+'</td></tr>').join('');
+ $('tb').innerHTML=st.log.map(r=>'<tr><td>'+r.i+'</td><td>'+disp(r.n)+'</td><td>'+r.hit+'</td><td style="text-align:left">'+(r.bets.map(b=>b.k+' '+b.S+'→<span class="'+(b.r<0?'neg':'pos')+'">'+(b.r>0?'+':'')+b.r+'</span>').join('<br>')+(r.Z?'<br>Z '+r.Z:'')+(r.swaps&&r.swaps.length?'<br><i>swap '+r.swaps.join(', ')+'</i>':'')||'–')+'</td><td class="'+(r.res<0?'neg':r.res>0?'pos':'')+'">'+(r.played?money(r.res):'')+'</td><td>'+money(r.net)+'</td></tr>').join('');
  ['unit','tmax','bank'].forEach(k=>$(k).value=c[k]);$('wheel').value=c.wheel;$('hedge').value=c.hedge?'on':'off';$('useD').checked=c.useD;$('useC').checked=c.useC}
 $('pad').onclick=e=>{const t=e.target.closest('[data-n]');if(!t)return;const n=+t.dataset.n,bet=nextBet(st);
  if(bet&&bet.outlay>walletBal(st)&&!confirm('Your wallet ('+money(walletBal(st))+') can\'t cover this bet ('+money(bet.outlay)+'). Record the spin anyway?'))return;
@@ -127,6 +132,7 @@ $('dl').onclick=()=>{const a=document.createElement('a');a.href=URL.createObject
 const svg='<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 192 192"><rect width="192" height="192" rx="36" fill="#0b3d2a"/><circle cx="96" cy="96" r="62" fill="none" stroke="#d4af37" stroke-width="12"/><text x="96" y="118" font-size="64" text-anchor="middle" fill="#ffd75e" font-family="sans-serif" font-weight="bold">Fib</text></svg>';
 const icon='data:image/svg+xml,'+encodeURIComponent(svg);$('ic').href=icon;
 $('mf').href='data:application/manifest+json,'+encodeURIComponent(JSON.stringify({name:'Fibonacci Two-Dozen Roulette',short_name:'Fib Roulette',display:'standalone',background_color:'#062a1c',theme_color:'#0b3d2a',start_url:'.',icons:[{src:icon,sizes:'192x192',type:'image/svg+xml'}]}));
-const qp=new URLSearchParams(location.search);if(qp.get('demo')){st=newState({hedge:qp.get('demo')==='hedge',bank:200});[1,4,0,1,1].forEach(n=>applySpin(st,n));st.lad={D:[1,3,5],C:[2,1,4]}}
+const qp=new URLSearchParams(location.search);if(qp.get('demo')){st=newState({hedge:qp.get('demo')==='hedge',bank:200});[1,1,0,0,14,0].forEach(n=>applySpin(st,n))}
+if(qp.get('scroll')){['stats','wallet'].forEach(i=>$(i).style.display='none');$('ladders').parentNode.style.display='none'}
 render();
 </script></body></html>
