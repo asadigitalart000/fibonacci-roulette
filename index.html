@@ -1,0 +1,98 @@
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#0b3d2a"><meta name="apple-mobile-web-app-capable" content="yes">
+<title>Fibonacci Two-Dozen Roulette Calculator</title>
+<link rel="manifest" id="mf"><link rel="icon" id="ic">
+<style>
+*{box-sizing:border-box}body{margin:0;font-family:system-ui,-apple-system,Segoe UI,Roboto,sans-serif;background:#062a1c;color:#eef5ef}
+header{background:linear-gradient(135deg,#0b3d2a,#0f5a3c);padding:12px 14px;display:flex;justify-content:space-between;align-items:center;position:sticky;top:0;z-index:5}
+h1{font-size:16px;margin:0}nav button{background:none;border:1px solid #d4af37;color:#d4af37;border-radius:8px;padding:6px 10px;margin-left:4px;font-size:13px}
+nav button.on{background:#d4af37;color:#062a1c}
+main{padding:12px;max-width:520px;margin:auto}.card{background:#0c3a28;border:1px solid #165c40;border-radius:14px;padding:12px;margin-bottom:10px}
+.big{font-size:40px;font-weight:800;color:#ffd75e;text-align:center}.sub{text-align:center;font-size:17px;margin-top:4px}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:6px;font-size:14px}.grid2 b{color:#ffd75e}
+.warn{background:#7a1d1d;border:1px solid #e55;border-radius:10px;padding:8px;margin-bottom:8px;font-weight:600}
+.pad{display:grid;grid-template-columns:repeat(6,1fr);gap:5px}.pad button{height:48px;border:0;border-radius:10px;font-size:18px;font-weight:700;color:#fff}
+.r{background:#b3222b}.k{background:#1d1d1d}.z{background:#138a4f;grid-column:span 3}
+.row{display:flex;gap:6px;margin-top:8px}.row button,.btn{flex:1;height:46px;border-radius:10px;border:0;font-weight:700;font-size:15px;background:#d4af37;color:#062a1c}
+.btn.alt{background:#24493a;color:#eef5ef}label{display:block;margin:10px 0 4px;font-size:14px}
+input,select{width:100%;height:44px;border-radius:10px;border:1px solid #2a7a57;background:#062a1c;color:#fff;padding:0 10px;font-size:16px}
+table{width:100%;border-collapse:collapse;font-size:12px}td,th{padding:4px 3px;border-bottom:1px solid #165c40;text-align:center}
+.pos{color:#7fe39a}.neg{color:#ff8a8a}.note{font-size:12px;opacity:.8;line-height:1.4}.hide{display:none}
+</style></head><body>
+<header><h1>🎰 Fib Two-Dozen</h1><nav><button data-v="live" class="on">Live</button><button data-v="log">Log</button><button data-v="setup">Setup</button></nav></header>
+<main>
+<section id="live">
+<div id="warns"></div>
+<div class="card"><div class="note" style="text-align:center">NEXT BET</div><div class="big" id="stake">–</div><div class="sub" id="blocks"></div></div>
+<div class="card grid2" id="stats"></div>
+<div class="card"><div class="note" style="margin-bottom:6px">Tap the winning number</div><div class="pad" id="pad"></div>
+<div class="row"><button id="undo" class="btn alt">↶ Undo</button><button id="reset" class="btn alt">Reset session</button></div></div>
+<p class="note">House edge is 2.7% on single-zero and 5.26% on double-zero wheels. No staking system changes expected value.</p>
+</section>
+<section id="log" class="hide"><div class="row" style="margin-bottom:8px"><button id="copy" class="btn">Copy log</button><button id="dl" class="btn">Download .txt</button></div>
+<div class="card" style="overflow-x:auto"><table><thead><tr><th>#</th><th>No.</th><th>Hit</th><th>Play</th><th>S</th><th>Z</th><th>Result</th><th>Net</th></tr></thead><tbody id="tb"></tbody></table></div></section>
+<section id="setup" class="hide"><div class="card">
+<label>Unit size ($)</label><input id="unit" type="number" min="0.01" step="0.01">
+<label>Wheel</label><select id="wheel"><option value="single">Single zero (0)</option><option value="double">Double zero (0, 00)</option></select>
+<label>Block style</label><select id="style"><option value="dozens">Dozens (1-12, 13-24, 25-36)</option><option value="columns">Columns</option></select>
+<label>Zero hedge</label><select id="hedge"><option value="off">Off</option><option value="on">On</option></select>
+<label>Table maximum ($)</label><input id="tmax" type="number" min="0">
+<label>Bankroll ($)</label><input id="bank" type="number" min="0">
+<div class="row"><button id="save" class="btn">Save settings</button></div></div>
+<div class="card note"><b>How it works.</b> After each spin, tap the number. A block qualifies when it missed both of the last 2 spins. If 2+ qualify, bet stake S on the two coldest (longest since last hit across the log; ties go to the lower block). Fewer than 2 = no bet. Ladder 1,1,2,3,5,8…: any block hit resets to 1; a loss (zeros included) steps up one rung; no-bet spins leave it alone. Win = +S net, loss = −2S.<br><br><b>Zero hedge</b> (optional): Z covers 0 (35:1) or the 0/00 split (17:1). Assumption: the hedge is only placed on rounds where the dozen bet is live, so only those rounds count. Each live round without a zero is a hedge loss; after 23 in a row Z goes up 1 unit; any zero resets Z to 1 unit and the count to 0. A zero on a live round still steps the ladder up (both blocks lost).</div>
+</section></main>
+<script id="core">
+const FIB=n=>{let a=1,b=1;for(let i=1;i<n;i++)[a,b]=[b,a+b];return a};
+function blockOf(n,style){if(n===0||n===37||n==='00')return -1;return style==='columns'?(n-1)%3:Math.floor((n-1)/12)}
+function newState(cfg){return{cfg:Object.assign({unit:1,wheel:'single',style:'dozens',hedge:false,tmax:500,bank:500},cfg||{}),
+ spins:[],count:0,lastHit:[null,null,null],ladder:1,zUnits:1,hedgeLoss:0,net:0,lastWinSpin:0,log:[]}}
+function signal(st){const s=st.spins;if(s.length<2)return null;const last2=s.slice(-2).map(n=>blockOf(n,st.cfg.style));
+ const q=[0,1,2].filter(b=>!last2.includes(b));if(q.length<2)return null;
+ const cold=b=>st.lastHit[b]===null?st.count+1:st.count-st.lastHit[b];
+ q.sort((a,b)=>cold(b)-cold(a)||a-b);return q.slice(0,2).sort((a,b)=>a-b)}
+function nextBet(st){const bl=signal(st);if(!bl)return null;const S=FIB(st.ladder)*st.cfg.unit;const Z=st.cfg.hedge?st.zUnits*st.cfg.unit:0;return{blocks:bl,S,Z,outlay:2*S+Z}}
+function applySpin(st,n){const bet=nextBet(st);const b=blockOf(n,st.cfg.style);const isZ=b===-1;st.count++;let res=0;
+ if(bet){const win=bet.blocks.includes(b);res+=win?bet.S:-2*bet.S;if(win){st.ladder=1;st.lastWinSpin=st.count}else st.ladder++;
+  if(st.cfg.hedge){if(isZ){res+=bet.Z*(st.cfg.wheel==='double'?17:35);st.zUnits=1;st.hedgeLoss=0}
+   else{res-=bet.Z;st.hedgeLoss++;if(st.hedgeLoss>=23){st.zUnits++;st.hedgeLoss=0}}}}
+ if(b>=0)st.lastHit[b]=st.count;st.spins.push(n);if(st.spins.length>333)st.spins.shift();st.net+=res;
+ st.log.unshift({i:st.count,n,hit:b,played:!!bet,blocks:bet?bet.blocks:null,S:bet?bet.S:0,Z:bet?bet.Z:0,res,net:st.net});
+ if(st.log.length>333)st.log.length=333;return st}
+const clone=o=>JSON.parse(JSON.stringify(o));
+function push(hist,st){hist.push(clone(st));if(hist.length>334)hist.shift()}
+if(typeof module!=='undefined')module.exports={FIB,blockOf,newState,signal,nextBet,applySpin,clone,push};
+</script>
+<script>
+const NAMES={dozens:['1st 12 (1-12)','2nd 12 (13-24)','3rd 12 (25-36)'],columns:['Col 1 (1,4,7…)','Col 2 (2,5,8…)','Col 3 (3,6,9…)']};
+const REDS=[1,3,5,7,9,12,14,16,18,19,21,23,25,27,30,32,34,36];const $=id=>document.getElementById(id);
+let st,hist=[];try{st=JSON.parse(localStorage.fibr_state);hist=JSON.parse(localStorage.fibr_hist||'[]')}catch(e){}
+if(!st)st=newState();const money=v=>(v<0?'-$':'$')+Math.abs(v).toFixed(2).replace(/\.00$/,'');
+const disp=n=>n===37?'00':String(n);
+function save(){localStorage.fibr_state=JSON.stringify(st);try{localStorage.fibr_hist=JSON.stringify(hist.slice(-60))}catch(e){}}
+function render(){const c=st.cfg,bet=nextBet(st),nm=NAMES[c.style];
+ $('stake').textContent=bet?money(bet.S)+' each':'No bet';$('blocks').textContent=bet?bet.blocks.map(b=>nm[b]).join('  +  '):(st.spins.length<2?'Wait – need 2 spins':'Wait – fewer than 2 cold blocks');
+ const w=[];if(bet&&bet.outlay>c.tmax)w.push('⚠ Outlay '+money(bet.outlay)+' exceeds table max '+money(c.tmax));if(-st.net>c.bank)w.push('⚠ Loss '+money(-st.net)+' exceeds bankroll '+money(c.bank));
+ $('warns').innerHTML=w.map(x=>'<div class="warn">'+x+'</div>').join('');
+ const it=[['Ladder pos',st.ladder],['Ladder value',FIB(st.ladder)],['Signal',bet?'BET':'Waiting'],['Total outlay',bet?money(bet.outlay):'$0'],
+ ['Spins since win',st.count-st.lastWinSpin],['Session net','<span class="'+(st.net<0?'neg':'pos')+'">'+money(st.net)+'</span>']];
+ if(c.hedge)it.splice(3,0,['Zero hedge Z',money(st.zUnits*c.unit)],['Hedge losses',st.hedgeLoss+' / 23']);
+ $('stats').innerHTML=it.map(([k,v])=>'<div>'+k+'<br><b>'+v+'</b></div>').join('');
+ const nums=[0];if(c.wheel==='double')nums.push(37);let h='';
+ nums.forEach(n=>h+='<button class="z" style="'+(c.wheel==='single'?'grid-column:span 6':'')+'" data-n="'+n+'">'+disp(n)+'</button>');
+ for(let i=1;i<=36;i++)h+='<button class="'+(REDS.includes(i)?'r':'k')+'" data-n="'+i+'">'+i+'</button>';$('pad').innerHTML=h;
+ $('tb').innerHTML=st.log.map(r=>'<tr><td>'+r.i+'</td><td>'+disp(r.n)+'</td><td>'+(r.hit<0?'0':['B1','B2','B3'][r.hit])+'</td><td>'+(r.played?'Y':'–')+'</td><td>'+(r.S||'')+'</td><td>'+(r.Z||'')+'</td><td class="'+(r.res<0?'neg':r.res>0?'pos':'')+'">'+(r.played?money(r.res):'')+'</td><td>'+money(r.net)+'</td></tr>').join('');
+ ['unit','tmax','bank'].forEach(k=>$(k).value=c[k]);$('wheel').value=c.wheel;$('style').value=c.style;$('hedge').value=c.hedge?'on':'off'}
+$('pad').onclick=e=>{const n=e.target.dataset.n;if(n===undefined)return;push(hist,st);applySpin(st,+n);save();render()};
+$('undo').onclick=()=>{if(hist.length){st=hist.pop();save();render()}};
+$('reset').onclick=()=>{if(confirm('Reset session? Settings are kept.')){push(hist,st);st=newState(st.cfg);save();render()}};
+$('save').onclick=()=>{push(hist,st);Object.assign(st.cfg,{unit:+$('unit').value||1,tmax:+$('tmax').value||0,bank:+$('bank').value||0,wheel:$('wheel').value,style:$('style').value,hedge:$('hedge').value==='on'});save();render();alert('Saved')};
+document.querySelectorAll('nav button').forEach(b=>b.onclick=()=>{document.querySelectorAll('nav button').forEach(x=>x.classList.toggle('on',x===b));['live','log','setup'].forEach(v=>$(v).classList.toggle('hide',v!==b.dataset.v))});
+function txt(){return 'Fibonacci Two-Dozen log (newest first)\n#\tNum\tBlock\tPlayed\tS\tZ\tResult\tNet\n'+st.log.map(r=>[r.i,disp(r.n),r.hit<0?'zero':'B'+(r.hit+1),r.played?'Y':'N',r.S,r.Z,r.res,r.net].join('\t')).join('\n')}
+$('copy').onclick=()=>{navigator.clipboard?navigator.clipboard.writeText(txt()).then(()=>alert('Copied')):prompt('Copy:',txt())};
+$('dl').onclick=()=>{const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([txt()],{type:'text/plain'}));a.download='roulette-log.txt';a.click()};
+const svg='<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 192 192"><rect width="192" height="192" rx="36" fill="#0b3d2a"/><circle cx="96" cy="96" r="62" fill="none" stroke="#d4af37" stroke-width="12"/><text x="96" y="118" font-size="64" text-anchor="middle" fill="#ffd75e" font-family="sans-serif" font-weight="bold">Fib</text></svg>';
+const icon='data:image/svg+xml,'+encodeURIComponent(svg);$('ic').href=icon;
+$('mf').href='data:application/manifest+json,'+encodeURIComponent(JSON.stringify({name:'Fibonacci Two-Dozen Roulette',short_name:'Fib Roulette',display:'standalone',background_color:'#062a1c',theme_color:'#0b3d2a',start_url:'.',icons:[{src:icon,sizes:'192x192',type:'image/svg+xml'}]}));
+render();
+</script></body></html>
