@@ -1,7 +1,7 @@
 <!DOCTYPE html><html lang="en"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="theme-color" content="#0b3d2a"><meta name="apple-mobile-web-app-capable" content="yes">
-<title>Fibonacci Two-Dozen Roulette Calculator</title>
+<title>Fibonacci Dozens + Columns Roulette</title>
 <link rel="manifest" id="mf"><link rel="icon" id="ic">
 <style>
 *{box-sizing:border-box}body{margin:0;font-family:system-ui,-apple-system,Segoe UI,Roboto,sans-serif;background:#062a1c;color:#eef5ef}
@@ -9,7 +9,7 @@ header{background:linear-gradient(135deg,#0b3d2a,#0f5a3c);padding:12px 14px;disp
 h1{font-size:16px;margin:0}nav button{background:none;border:1px solid #d4af37;color:#d4af37;border-radius:8px;padding:6px 10px;margin-left:4px;font-size:13px}
 nav button.on{background:#d4af37;color:#062a1c}
 main{padding:12px;max-width:520px;margin:auto}.card{background:#0c3a28;border:1px solid #165c40;border-radius:14px;padding:12px;margin-bottom:10px}
-.big{font-size:40px;font-weight:800;color:#ffd75e;text-align:center}.sub{text-align:center;font-size:17px;margin-top:4px}
+.big{font-size:40px;font-weight:800;color:#ffd75e;text-align:center}.sub{text-align:center;font-size:15px;line-height:1.6;margin-top:4px}
 .grid2{display:grid;grid-template-columns:1fr 1fr;gap:6px;font-size:14px}.grid2 b{color:#ffd75e}
 .warn{background:#7a1d1d;border:1px solid #e55;border-radius:10px;padding:8px;margin-bottom:8px;font-weight:600}
 
@@ -30,94 +30,103 @@ input,select{width:100%;height:44px;border-radius:10px;border:1px solid #2a7a57;
 table{width:100%;border-collapse:collapse;font-size:12px}td,th{padding:4px 3px;border-bottom:1px solid #165c40;text-align:center}
 .pos{color:#7fe39a}.neg{color:#ff8a8a}.note{font-size:12px;opacity:.8;line-height:1.4}.hide{display:none}
 </style></head><body>
-<header><h1>🎰 Fib Two-Dozen</h1><nav><button data-v="live" class="on">Live</button><button data-v="log">Log</button><button data-v="setup">Setup</button></nav></header>
+<header><h1>🎰 Fib Dozens + Columns</h1><nav><button data-v="live" class="on">Live</button><button data-v="log">Log</button><button data-v="setup">Setup</button></nav></header>
 <main>
 <section id="live">
 <div id="warns"></div>
-<div class="card"><div class="note" style="text-align:center">NEXT BET</div><div class="big" id="stake">–</div><div class="sub" id="blocks"></div></div>
+<div class="card"><div class="note" style="text-align:center">NEXT BET – TOTAL OUTLAY</div><div class="big" id="stake">–</div><div class="sub" id="blocks"></div></div>
 <div class="card grid2" id="stats"></div>
-<div class="card wal" id="wallet"></div><div class="card"><div class="note" style="margin-bottom:6px">Tap the winning number (table shown vertically)</div><div class="tbl" id="pad"></div>
+<div class="card wal" id="wallet"></div><div class="card"><div class="note">6 independent Fibonacci ladders</div><table id="ladders"></table></div><div class="card"><div class="note" style="margin-bottom:6px">Tap the winning number (table shown vertically)</div><div class="tbl" id="pad"></div>
 <div class="row"><button id="undo" class="btn alt">↶ Undo</button><button id="reset" class="btn alt">Reset session</button></div></div>
 <p class="note">House edge is 2.7% on single-zero and 5.26% on double-zero wheels. No staking system changes expected value.</p>
 </section>
 <section id="log" class="hide"><div class="row" style="margin-bottom:8px"><button id="copy" class="btn">Copy log</button><button id="dl" class="btn">Download .txt</button></div>
-<div class="card" style="overflow-x:auto"><table><thead><tr><th>#</th><th>No.</th><th>Hit</th><th>Play</th><th>S</th><th>Z</th><th>Result</th><th>Net</th></tr></thead><tbody id="tb"></tbody></table></div></section>
+<div class="card" style="overflow-x:auto"><table><thead><tr><th>#</th><th>No.</th><th>Hit</th><th>Bets</th><th>Round</th><th>Net</th></tr></thead><tbody id="tb"></tbody></table></div></section>
 <section id="setup" class="hide"><div class="card">
 <label>Unit size ($)</label><input id="unit" type="number" min="0.01" step="0.01">
 <label>Wheel</label><select id="wheel"><option value="single">European (single 0)</option><option value="double">American (0 and 00)</option></select>
-<label>Block style</label><select id="style"><option value="dozens">Dozens (1-12, 13-24, 25-36)</option><option value="columns">Columns</option></select>
-<label>Zero hedge</label><select id="hedge"><option value="off">Off</option><option value="on">On</option></select>
+<label><input type="checkbox" id="useD" style="width:auto;height:auto"> Bet the dozen side</label><label><input type="checkbox" id="useC" style="width:auto;height:auto"> Bet the column side</label><label>Zero hedge</label><select id="hedge"><option value="off">Off</option><option value="on">On</option></select>
 <label>Table maximum ($)</label><input id="tmax" type="number" min="0">
 <label>Wallet – starting balance ($)</label><input id="bank" type="number" min="0">
 <div class="row"><button id="save" class="btn">Save settings</button></div></div>
-<div class="card note"><b>How it works.</b> After each spin, tap the number. A block qualifies when it missed both of the last 2 spins. If 2+ qualify, bet stake S on the two coldest (longest since last hit across the log; ties go to the lower block). Fewer than 2 = no bet. Ladder 1,1,2,3,5,8…: any block hit resets to 1; a loss (zeros included) steps up one rung; no-bet spins leave it alone. Win = +S net, loss = −2S.<br><br><b>Zero hedge</b> (optional): Z covers 0 (35:1) or the 0/00 split (17:1). Assumption: the hedge is only placed on rounds where the dozen bet is live, so only those rounds count. Each live round without a zero is a hedge loss; after 23 in a row Z goes up 1 unit; any zero resets Z to 1 unit and the count to 0. A zero on a live round still steps the ladder up (both blocks lost).</div>
+<div class="card note"><b>How it works.</b> After each spin, tap the number. Two sides are tracked separately: dozens (1st/2nd/3rd 12) and columns (2 to 1). On each side a block qualifies when it missed both of the last 2 spins; if 2+ qualify, bet the two coldest (longest since last hit across the log; ties go to the lower block). So a round has 0, 2 or 4 bets. Each of the 6 blocks has its own Fibonacci ladder (1,1,2,3,5,8…): stake = its ladder value × unit. A bet block that hits nets +2× its stake and resets to 1; a bet block that misses (zeros included) loses its stake and steps up one rung; unbet blocks keep their ladder.<br><br><b>Zero hedge</b> (optional): Z covers 0 (35:1) or the 0/00 split (17:1), placed only on rounds where any bet is live. Each such round without a zero is a hedge loss; after 23 in a row Z goes up 1 unit; any zero resets Z to 1 unit and the count to 0.<br><br><b>Can cover N more losses</b> assumes the current (or next most likely) bets all keep losing, each stepping up its own ladder.</div>
 </section></main>
 <script id="core">
 const FIB=n=>{let a=1,b=1;for(let i=1;i<n;i++)[a,b]=[b,a+b];return a};
-function blockOf(n,style){if(n===0||n===37||n==='00')return -1;return style==='columns'?(n-1)%3:Math.floor((n-1)/12)}
-function newState(cfg){return{cfg:Object.assign({unit:1,wheel:'single',style:'dozens',hedge:false,tmax:500,bank:500},cfg||{}),
- spins:[],count:0,lastHit:[null,null,null],ladder:1,zUnits:1,hedgeLoss:0,net:0,lastWinSpin:0,log:[]}}
-function signal(st){const s=st.spins;if(s.length<2)return null;const last2=s.slice(-2).map(n=>blockOf(n,st.cfg.style));
- const q=[0,1,2].filter(b=>!last2.includes(b));if(q.length<2)return null;
- const cold=b=>st.lastHit[b]===null?st.count+1:st.count-st.lastHit[b];
- q.sort((a,b)=>cold(b)-cold(a)||a-b);return q.slice(0,2).sort((a,b)=>a-b)}
-function nextBet(st){const bl=signal(st);if(!bl)return null;const S=FIB(st.ladder)*st.cfg.unit;const Z=st.cfg.hedge?st.zUnits*st.cfg.unit:0;return{blocks:bl,S,Z,outlay:2*S+Z}}
-function applySpin(st,n){const bet=nextBet(st);const b=blockOf(n,st.cfg.style);const isZ=b===-1;st.count++;let res=0;
- if(bet){const win=bet.blocks.includes(b);res+=win?bet.S:-2*bet.S;if(win){st.ladder=1;st.lastWinSpin=st.count}else st.ladder++;
+const SIDES=['D','C'];
+function hitsOf(n){if(n===0||n===37)return{D:-1,C:-1};return{D:Math.floor((n-1)/12),C:(n-1)%3}}
+function newState(cfg){return{cfg:Object.assign({unit:1,wheel:'single',hedge:false,useD:true,useC:true,tmax:500,bank:500},cfg||{}),
+ spins:[],count:0,lastHit:{D:[null,null,null],C:[null,null,null]},lad:{D:[1,1,1],C:[1,1,1]},zUnits:1,hedgeLoss:0,net:0,lastWinSpin:0,log:[]}}
+const cold=(st,side,i)=>st.lastHit[side][i]===null?st.count+1:st.count-st.lastHit[side][i];
+const rank=(st,side,q)=>q.sort((a,b)=>cold(st,side,b)-cold(st,side,a)||a-b).slice(0,2).sort((a,b)=>a-b);
+function signalSide(st,side){if(!st.cfg['use'+side])return null;const s=st.spins;if(s.length<2)return null;
+ const last2=s.slice(-2).map(n=>hitsOf(n)[side]);const q=[0,1,2].filter(i=>!last2.includes(i));return q.length<2?null:rank(st,side,q)}
+function nextBet(st){const bets=[];for(const side of SIDES){const bl=signalSide(st,side);if(bl)bl.forEach(i=>bets.push({side,i,S:FIB(st.lad[side][i])*st.cfg.unit}))}
+ if(!bets.length)return null;const Z=st.cfg.hedge?st.zUnits*st.cfg.unit:0;return{bets,Z,outlay:bets.reduce((t,b)=>t+b.S,0)+Z}}
+function applySpin(st,n){const bet=nextBet(st),h=hitsOf(n),isZ=h.D===-1;st.count++;let res=0,rows=[];
+ if(bet){let anyWin=false;for(const b of bet.bets){const win=h[b.side]===b.i;const r=win?2*b.S:-b.S;res+=r;rows.push({k:b.side+(b.i+1),S:b.S,r});
+   if(win){st.lad[b.side][b.i]=1;anyWin=true}else st.lad[b.side][b.i]++}
+  if(anyWin)st.lastWinSpin=st.count;
   if(st.cfg.hedge){if(isZ){res+=bet.Z*(st.cfg.wheel==='double'?17:35);st.zUnits=1;st.hedgeLoss=0}
    else{res-=bet.Z;st.hedgeLoss++;if(st.hedgeLoss>=23){st.zUnits++;st.hedgeLoss=0}}}}
- if(b>=0)st.lastHit[b]=st.count;st.spins.push(n);if(st.spins.length>333)st.spins.shift();st.net+=res;
- st.log.unshift({i:st.count,n,hit:b,played:!!bet,blocks:bet?bet.blocks:null,S:bet?bet.S:0,Z:bet?bet.Z:0,res,net:st.net});
+ if(!isZ){st.lastHit.D[h.D]=st.count;st.lastHit.C[h.C]=st.count}
+ st.spins.push(n);if(st.spins.length>333)st.spins.shift();st.net+=res;
+ st.log.unshift({i:st.count,n,hit:isZ?'zero':'D'+(h.D+1)+' C'+(h.C+1),played:!!bet,bets:rows,Z:bet?bet.Z:0,res,net:st.net});
  if(st.log.length>333)st.log.length=333;return st}
 function posOf(n){return{row:2-((n-1)%3),col:Math.ceil(n/3)-1}}
 function tableRows(){return[0,1,2].map(r=>Array.from({length:12},(_,c)=>3*c+3-r))}
 function walletBal(st){return st.cfg.bank+st.net}
-function pocketDepth(st,max=200){const u=st.cfg.unit;let bal=walletBal(st),L=st.ladder,z=st.zUnits,hl=st.hedgeLoss,k=0;
- while(k<max){const cost=2*FIB(L)*u+(st.cfg.hedge?z*u:0);if(cost>bal)break;bal-=cost;k++;L++;if(st.cfg.hedge){hl++;if(hl>=23){z++;hl=0}}}
- return{depth:k,maxRung:st.ladder+k-1}}
+function likelyBets(st){const nb=nextBet(st);if(nb)return nb.bets.map(b=>({side:b.side,i:b.i}));const o=[];
+ for(const side of SIDES)if(st.cfg['use'+side])rank(st,side,[0,1,2]).forEach(i=>o.push({side,i}));return o}
+function pocketDepth(st,max=200){const u=st.cfg.unit,bets=likelyBets(st),L=bets.map(b=>st.lad[b.side][b.i]);let bal=walletBal(st),z=st.zUnits,hl=st.hedgeLoss,k=0;
+ if(!bets.length)return{depth:0,maxRung:0};
+ while(k<max){const cost=L.reduce((t,l)=>t+FIB(l)*u,0)+(st.cfg.hedge?z*u:0);if(cost>bal)break;bal-=cost;k++;for(let j=0;j<L.length;j++)L[j]++;if(st.cfg.hedge){hl++;if(hl>=23){z++;hl=0}}}
+ return{depth:k,maxRung:k?Math.max(...L)-1:0}}
 const clone=o=>JSON.parse(JSON.stringify(o));
 function push(hist,st){hist.push(clone(st));if(hist.length>334)hist.shift()}
-if(typeof module!=='undefined')module.exports={FIB,blockOf,newState,signal,nextBet,applySpin,clone,push,posOf,tableRows,walletBal,pocketDepth};
+if(typeof module!=='undefined')module.exports={FIB,hitsOf,newState,signalSide,nextBet,applySpin,clone,push,posOf,tableRows,walletBal,pocketDepth,likelyBets};
 </script>
 <script>
-const NAMES={dozens:['1st 12 (1-12)','2nd 12 (13-24)','3rd 12 (25-36)'],columns:['Col 1 (1,4,7…)','Col 2 (2,5,8…)','Col 3 (3,6,9…)']};
 const REDS=[1,3,5,7,9,12,14,16,18,19,21,23,25,27,30,32,34,36];const $=id=>document.getElementById(id);
-let st,hist=[];try{st=JSON.parse(localStorage.fibr_state);hist=JSON.parse(localStorage.fibr_hist||'[]')}catch(e){}
+let st,hist=[];try{st=JSON.parse(localStorage.fibr2_state);hist=JSON.parse(localStorage.fibr2_hist||'[]')}catch(e){}
 if(!st)st=newState();const money=v=>(v<0?'-$':'$')+Math.abs(v).toFixed(2).replace(/\.00$/,'');
-const disp=n=>n===37?'00':String(n);
-function save(){localStorage.fibr_state=JSON.stringify(st);try{localStorage.fibr_hist=JSON.stringify(hist.slice(-60))}catch(e){}}
-function render(){const c=st.cfg,bet=nextBet(st),nm=NAMES[c.style];
- $('stake').textContent=bet?money(bet.S)+' each':'No bet';$('blocks').textContent=bet?bet.blocks.map(b=>nm[b]).join('  +  '):(st.spins.length<2?'Wait – need 2 spins':'Wait – fewer than 2 cold blocks');
- const w=[];if(bet&&bet.outlay>c.tmax)w.push('⚠ Outlay '+money(bet.outlay)+' exceeds table max '+money(c.tmax));const bal=walletBal(st),pd=pocketDepth(st);if(bet&&bet.outlay>bal)w.push('⚠ Next bet '+money(bet.outlay)+' exceeds wallet '+money(bal));
- $('wallet').innerHTML='<div>Wallet<br><b class="'+(bal<0?'neg':'')+'">'+money(bal)+'</b></div><div style="text-align:right">Can cover <b>'+pd.depth+'</b> more losses<br><span class="note">max rung '+(pd.depth?pd.maxRung+' ($'+FIB(pd.maxRung)*c.unit+')':'–')+'</span></div>';
+const disp=n=>n===37?'00':String(n);const BN={D:['1st 12','2nd 12','3rd 12'],C:['Col 1','Col 2','Col 3']};
+function save(){localStorage.fibr2_state=JSON.stringify(st);try{localStorage.fibr2_hist=JSON.stringify(hist.slice(-60))}catch(e){}}
+function render(){const c=st.cfg,bet=nextBet(st);const sOf=(side,i)=>bet&&bet.bets.find(b=>b.side===side&&b.i===i);
+ $('stake').textContent=bet?money(bet.outlay):'No bet';
+ $('blocks').innerHTML=bet?bet.bets.map(b=>BN[b.side][b.i]+' <b>'+money(b.S)+'</b>').join(' · ')+(bet.Z?' · Zero <b>'+money(bet.Z)+'</b>':''):(st.spins.length<2?'Wait – need 2 spins':'Wait – fewer than 2 cold blocks on each side');
+ const bal=walletBal(st),pd=pocketDepth(st),w=[];
+ if(bet&&bet.outlay>c.tmax)w.push('⚠ Outlay '+money(bet.outlay)+' exceeds table max '+money(c.tmax));
+ if(bet&&bet.outlay>bal)w.push('⚠ Next bet '+money(bet.outlay)+' exceeds wallet '+money(bal));
  $('warns').innerHTML=w.map(x=>'<div class="warn">'+x+'</div>').join('');
- const it=[['Ladder pos',st.ladder],['Ladder value',FIB(st.ladder)],['Signal',bet?'BET':'Waiting'],['Total outlay',bet?money(bet.outlay):'$0'],
- ['Spins since win',st.count-st.lastWinSpin],['Session net','<span class="'+(st.net<0?'neg':'pos')+'">'+money(st.net)+'</span>']];
- if(c.hedge)it.splice(3,0,['Zero hedge Z',money(st.zUnits*c.unit)],['Hedge losses',st.hedgeLoss+' / 23']);
+ $('wallet').innerHTML='<div>Wallet<br><b class="'+(bal<0?'neg':'')+'">'+money(bal)+'</b></div><div style="text-align:right">Can cover <b>'+pd.depth+'</b> more losses<br><span class="note">'+(pd.depth?'highest rung '+pd.maxRung+' ($'+FIB(pd.maxRung)*c.unit+')':'')+'</span></div>';
+ const it=[['Bets this round',bet?bet.bets.length:0],['Total outlay',bet?money(bet.outlay):'$0'],['Spins since win',st.count-st.lastWinSpin],['Session net','<span class="'+(st.net<0?'neg':'pos')+'">'+money(st.net)+'</span>']];
+ if(c.hedge)it.push(['Zero hedge Z',money(st.zUnits*c.unit)],['Hedge losses',st.hedgeLoss+' / 23']);
  $('stats').innerHTML=it.map(([k,v])=>'<div>'+k+'<br><b>'+v+'</b></div>').join('');
- const chip=v=>'<span class="chip">'+v+'</span>',isB=i=>bet&&bet.blocks.includes(i);let h='';
- if(c.wheel==='double'){const sp=bet&&c.hedge?chip(bet.Z):'';h+='<div></div><div style="grid-column:span 3;display:grid;grid-template-columns:1fr 1fr;gap:4px;position:relative"><button class="c zz" data-n="0">0</button><button class="c zz" data-n="37">00</button>'+(sp?'<span class="chip" style="left:50%;right:auto;margin-left:-13px">'+bet.Z+'</span>':'')+'</div>'}
- else h+='<div></div><button class="c zz" style="grid-column:span 3" data-n="0">0'+(bet&&c.hedge?chip(bet.Z):'')+'</button>';
- const dn=['1st 12','2nd 12','3rd 12'];
- for(let r=0;r<12;r++){if(r%4===0){const d=r/4;h+='<div class="c dz'+(c.style==='dozens'&&isB(d)?' bet':'')+'" id="blk'+(c.style==='dozens'?d:'x'+d)+'" style="grid-row:span 4">'+dn[d]+(c.style==='dozens'&&isB(d)?chip(bet.S):'')+'</div>'}
+ $('ladders').innerHTML='<tr><th>Block</th><th>Rung</th><th>Value</th><th>Since hit</th><th>Bet</th></tr>'+['D','C'].flatMap(side=>[0,1,2].map(i=>{const b=sOf(side,i),on=c['use'+side];
+  return '<tr'+(on?'':' style="opacity:.4"')+'><td>'+BN[side][i]+'</td><td>'+st.lad[side][i]+'</td><td>'+FIB(st.lad[side][i])+'</td><td>'+(st.lastHit[side][i]===null?'–':st.count-st.lastHit[side][i])+'</td><td>'+(b?'<b>'+money(b.S)+'</b>':'')+'</td></tr>'})).join('');
+ const chip=v=>'<span class="chip">'+v+'</span>';let h='';
+ if(c.wheel==='double')h+='<div></div><div style="grid-column:span 3;display:grid;grid-template-columns:1fr 1fr;gap:4px;position:relative"><button class="c zz" data-n="0">0</button><button class="c zz" data-n="37">00</button>'+(bet&&bet.Z?'<span class="chip" style="left:50%;right:auto;margin-left:-13px">'+bet.Z+'</span>':'')+'</div>';
+ else h+='<div></div><button class="c zz" style="grid-column:span 3" data-n="0">0'+(bet&&bet.Z?chip(bet.Z):'')+'</button>';
+ for(let r=0;r<12;r++){if(r%4===0){const d=r/4,b=sOf('D',d);h+='<div class="c dz'+(b?' bet':'')+'" id="blkD'+d+'" style="grid-row:span 4"><span class="lb">'+BN.D[d]+'</span>'+(b?chip(b.S):'')+'</div>'}
   for(let k=1;k<=3;k++){const n=3*r+k;h+='<button class="c '+(REDS.includes(n)?'r':'k')+'" id="n'+n+'" data-n="'+n+'">'+n+'</button>'}}
- h+='<div></div>'+[0,1,2].map(i=>'<div class="c cl'+(c.style==='columns'&&isB(i)?' bet':'')+'" id="'+(c.style==='columns'?'blk'+i:'')+'">2 to 1'+(c.style==='columns'&&isB(i)?chip(bet.S):'')+'</div>').join('');
+ h+='<div></div>'+[0,1,2].map(i=>{const b=sOf('C',i);return '<div class="c cl'+(b?' bet':'')+'" id="blkC'+i+'">2 to 1'+(b?chip(b.S):'')+'</div>'}).join('');
  $('pad').innerHTML=h;
- $('tb').innerHTML=st.log.map(r=>'<tr><td>'+r.i+'</td><td>'+disp(r.n)+'</td><td>'+(r.hit<0?'0':['B1','B2','B3'][r.hit])+'</td><td>'+(r.played?'Y':'–')+'</td><td>'+(r.S||'')+'</td><td>'+(r.Z||'')+'</td><td class="'+(r.res<0?'neg':r.res>0?'pos':'')+'">'+(r.played?money(r.res):'')+'</td><td>'+money(r.net)+'</td></tr>').join('');
- ['unit','tmax','bank'].forEach(k=>$(k).value=c[k]);$('wheel').value=c.wheel;$('style').value=c.style;$('hedge').value=c.hedge?'on':'off'}
+ $('tb').innerHTML=st.log.map(r=>'<tr><td>'+r.i+'</td><td>'+disp(r.n)+'</td><td>'+r.hit+'</td><td style="text-align:left">'+(r.bets.map(b=>b.k+' '+b.S+'→<span class="'+(b.r<0?'neg':'pos')+'">'+(b.r>0?'+':'')+b.r+'</span>').join('<br>')+(r.Z?'<br>Z '+r.Z:'')||'–')+'</td><td class="'+(r.res<0?'neg':r.res>0?'pos':'')+'">'+(r.played?money(r.res):'')+'</td><td>'+money(r.net)+'</td></tr>').join('');
+ ['unit','tmax','bank'].forEach(k=>$(k).value=c[k]);$('wheel').value=c.wheel;$('hedge').value=c.hedge?'on':'off';$('useD').checked=c.useD;$('useC').checked=c.useC}
 $('pad').onclick=e=>{const t=e.target.closest('[data-n]');if(!t)return;const n=+t.dataset.n,bet=nextBet(st);
  if(bet&&bet.outlay>walletBal(st)&&!confirm('Your wallet ('+money(walletBal(st))+') can\'t cover this bet ('+money(bet.outlay)+'). Record the spin anyway?'))return;
- push(hist,st);applySpin(st,n);save();render();const bi=blockOf(n,st.cfg.style);[$('n'+n)||document.querySelector('[data-n="'+n+'"]'),bi>=0&&$('blk'+bi)].forEach(x=>x&&x.classList.add('flash'))};
+ push(hist,st);applySpin(st,n);save();render();const h=hitsOf(n);[$('n'+n)||document.querySelector('[data-n="'+n+'"]'),h.D>=0&&$('blkD'+h.D),h.C>=0&&$('blkC'+h.C)].forEach(x=>x&&x.classList.add('flash'))};
 $('undo').onclick=()=>{if(hist.length){st=hist.pop();save();render()}};
 $('reset').onclick=()=>{if(confirm('Reset session? Settings are kept.')){push(hist,st);st=newState(st.cfg);save();render()}};
-$('save').onclick=()=>{push(hist,st);Object.assign(st.cfg,{unit:+$('unit').value||1,tmax:+$('tmax').value||0,bank:+$('bank').value||0,wheel:$('wheel').value,style:$('style').value,hedge:$('hedge').value==='on'});save();render();alert('Saved')};
+$('save').onclick=()=>{push(hist,st);Object.assign(st.cfg,{unit:+$('unit').value||1,tmax:+$('tmax').value||0,bank:+$('bank').value||0,wheel:$('wheel').value,hedge:$('hedge').value==='on',useD:$('useD').checked,useC:$('useC').checked});save();render();alert('Saved')};
 document.querySelectorAll('nav button').forEach(b=>b.onclick=()=>{document.querySelectorAll('nav button').forEach(x=>x.classList.toggle('on',x===b));['live','log','setup'].forEach(v=>$(v).classList.toggle('hide',v!==b.dataset.v))});
-function txt(){return 'Fibonacci Two-Dozen log (newest first)\n#\tNum\tBlock\tPlayed\tS\tZ\tResult\tNet\n'+st.log.map(r=>[r.i,disp(r.n),r.hit<0?'zero':'B'+(r.hit+1),r.played?'Y':'N',r.S,r.Z,r.res,r.net].join('\t')).join('\n')}
+function txt(){return 'Fibonacci Dozens+Columns log (newest first)\n#\tNum\tHit\tBets (block stake result)\tZ\tRound\tNet\n'+st.log.map(r=>[r.i,disp(r.n),r.hit,r.bets.map(b=>b.k+' '+b.S+' '+b.r).join(', ')||'no bet',r.Z,r.res,r.net].join('\t')).join('\n')}
 $('copy').onclick=()=>{navigator.clipboard?navigator.clipboard.writeText(txt()).then(()=>alert('Copied')):prompt('Copy:',txt())};
 $('dl').onclick=()=>{const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([txt()],{type:'text/plain'}));a.download='roulette-log.txt';a.click()};
 const svg='<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 192 192"><rect width="192" height="192" rx="36" fill="#0b3d2a"/><circle cx="96" cy="96" r="62" fill="none" stroke="#d4af37" stroke-width="12"/><text x="96" y="118" font-size="64" text-anchor="middle" fill="#ffd75e" font-family="sans-serif" font-weight="bold">Fib</text></svg>';
 const icon='data:image/svg+xml,'+encodeURIComponent(svg);$('ic').href=icon;
 $('mf').href='data:application/manifest+json,'+encodeURIComponent(JSON.stringify({name:'Fibonacci Two-Dozen Roulette',short_name:'Fib Roulette',display:'standalone',background_color:'#062a1c',theme_color:'#0b3d2a',start_url:'.',icons:[{src:icon,sizes:'192x192',type:'image/svg+xml'}]}));
-const qp=new URLSearchParams(location.search);if(qp.get('demo')){st=newState({hedge:qp.get('demo')==='hedge',bank:200});[25,26,30,33].forEach(n=>applySpin(st,n))}
+const qp=new URLSearchParams(location.search);if(qp.get('demo')){st=newState({hedge:qp.get('demo')==='hedge',bank:200});[1,4,0,1,1].forEach(n=>applySpin(st,n));st.lad={D:[1,3,5],C:[2,1,4]}}
 render();
 </script></body></html>
